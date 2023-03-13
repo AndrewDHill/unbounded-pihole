@@ -12,8 +12,9 @@ services:
     domainname: ${DOMAIN_NAME}
     ports:
       - 443:443/tcp
-      - 533:53/tcp
-      - 533:53/udp
+      - 53:53/tcp
+      - 53:53/udp
+      - 67:67/udp # this wasn't originally there but I added it for DCHP purposes, may not be correct.
       - ${PIHOLE_WEBPORT:-80}:80/tcp #Allows use of different port to access pihole web interface when other docker containers use port 80
       - 5335:5335/tcp # Uncomment to enable unbound access on local server
       # - 22/tcp # Uncomment to enable SSH
@@ -26,10 +27,54 @@ services:
       - REV_SERVER_TARGET=${REV_SERVER_TARGET}
       - REV_SERVER_DOMAIN=${REV_SERVER_DOMAIN}
       - REV_SERVER_CIDR=${REV_SERVER_CIDR}
-      - PIHOLE_DNS_=127.0.0.1#5335
+      - PIHOLE_DNS_=127.0.0.1#5335;::1#5335
       - DNSSEC="true"
-      - DNSMASQ_LISTENING=single
+      - DNSMASQ_LISTENING=all
+    network_mode: host
     volumes:
-      - pihole-unbound:/etc/pihole:rw
-      - pihole_dnsmasq-unbound:/etc/dnsmasq.d:rw
+      - etc_pihole-unbound:/etc/pihole:rw
+      - etc_pihole_dnsmasq-unbound:/etc/dnsmasq.d:rw
+    cap_add:
+      - NET_ADMIN # Required if you are using Pi-hole as your DHCP server, else not needed
     restart: unless-stopped
+
+# I had some issues getting this to work in a docker on my ubuntu install. I guess dnsmasq, or systemd-resolved was listening on 127.0.0.53 and break dns resolution. configs:
+# I followed instructions here: https://github.com/losuler/pihole-dnscrypt-docker/issues/5
+# Looks like I missed a step: 
+# '''section from pi-hole/docker-pi-hole.
+# After you've set DNSStubListener=no in /etc/systemd/resolved.conf (I think it's a better practice to edit this manually, 
+# rather than running that sed command, unless it's apart of an automation pipeline), you'll need to remove the symlink that 
+# this setting previously creates. systemd-resolved will infact inform you of this upon restarting the service, displaying a
+#  warning that says:
+#  '''DNSStubListener= is disabled, but /etc/resolv.conf is a symlink to /run/systemd/resolve/stub-resolv.conf which expects DNSStubListener= to be enabled.
+# '''
+# '''
+# sudo mv /etc/resolv.conf /etc/resolv.conf_orig
+# sudo ln -s /run/systemd/resolve/resolv.conf /etc/resolv.conf
+# sudo systemctl restart systemd-resolved
+# After I did this the docker-compose started without error.'''
+# My /etc/systemd/resolvd.conf looks like:configs:
+# #  This file is part of systemd.
+# #
+# #  systemd is free software; you can redistribute it and/or modify it
+# #  under the terms of the GNU Lesser General Public License as published by
+# #  the Free Software Foundation; either version 2.1 of the License, or
+# #  (at your option) any later version.
+# #
+# # Entries in this file show the compile time defaults.
+# # You can change settings by editing this file.
+# # Defaults can be restored by simply deleting this file.
+# #
+# # See resolved.conf(5) for details
+
+# [Resolve]
+# DNS=192.168.1.230
+# FallbackDNS=192.168.1.229
+# #Domains=
+# #LLMNR=no
+# #MulticastDNS=no
+# #DNSSEC=no
+# #DNSOverTLS=no
+# #Cache=no-negative
+# DNSStubListener=no
+# #ReadEtcHosts=yes
