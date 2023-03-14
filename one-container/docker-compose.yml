@@ -78,3 +78,14 @@ services:
 # #Cache=no-negative
 # DNSStubListener=no
 # #ReadEtcHosts=yes
+
+
+#### Updating ###
+# Read this https://github.com/pi-hole/docker-pi-hole/
+# TL;DR
+# pihole -up DOESN'T work
+
+# docker-compose down
+# docker pull cbcrowe/pihole-unbound
+# docker rm -f pihole # or whatever your container name is
+# docker-compose up -d
